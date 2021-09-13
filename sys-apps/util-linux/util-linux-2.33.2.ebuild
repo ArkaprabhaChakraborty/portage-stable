@@ -1,9 +1,9 @@
 # Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=7
+EAPI=6
 
-PYTHON_COMPAT=( python3_{6,7,8,9} )
+PYTHON_COMPAT=( python3_{6,7} )
 
 inherit toolchain-funcs libtool flag-o-matic bash-completion-r1 usr-ldscript \
 	pam python-r1 multilib-minimal multiprocessing systemd
@@ -16,56 +16,39 @@ if [[ ${PV} == 9999 ]] ; then
 	EGIT_REPO_URI="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git"
 else
 	[[ "${PV}" = *_rc* ]] || \
-	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~m68k ~mips ~ppc ~ppc64 ~riscv ~s390 ~sparc ~x86 ~amd64-linux ~x86-linux"
+	KEYWORDS="~alpha amd64 arm arm64 hppa ~ia64 ~m68k ~mips ppc ppc64 ~riscv s390 sparc x86 ~amd64-linux ~x86-linux"
 	SRC_URI="https://www.kernel.org/pub/linux/utils/util-linux/v${PV:0:4}/${MY_P}.tar.xz"
 fi
 
 DESCRIPTION="Various useful Linux utilities"
 HOMEPAGE="https://www.kernel.org/pub/linux/utils/util-linux/ https://github.com/karelzak/util-linux"
 
-LICENSE="GPL-2 GPL-3 LGPL-2.1 BSD-4 MIT public-domain"
+LICENSE="GPL-2 LGPL-2.1 BSD-4 MIT public-domain"
 SLOT="0"
-IUSE="audit build caps +cramfs cryptsetup fdformat hardlink kill +logger ncurses nls pam python +readline selinux slang static-libs su +suid systemd test tty-helpers udev unicode userland_GNU"
+IUSE="build caps +cramfs fdformat kill ncurses nls pam python +readline selinux slang static-libs +suid systemd test tty-helpers udev unicode userland_GNU"
 
 # Most lib deps here are related to programs rather than our libs,
 # so we rarely need to specify ${MULTILIB_USEDEP}.
-RDEPEND="
-	virtual/libcrypt:=
-	audit? ( >=sys-process/audit-2.6:= )
-	caps? ( sys-libs/libcap-ng )
+RDEPEND="caps? ( sys-libs/libcap-ng )
 	cramfs? ( sys-libs/zlib:= )
-	cryptsetup? ( sys-fs/cryptsetup )
-	hardlink? ( dev-libs/libpcre2:= )
 	ncurses? ( >=sys-libs/ncurses-5.2-r2:0=[unicode?] )
 	nls? ( virtual/libintl[${MULTILIB_USEDEP}] )
 	pam? ( sys-libs/pam )
-	ppc? ( sys-libs/librtas )
-	ppc64? ( sys-libs/librtas )
 	python? ( ${PYTHON_DEPS} )
 	readline? ( sys-libs/readline:0= )
 	selinux? ( >=sys-libs/libselinux-2.2.2-r4[${MULTILIB_USEDEP}] )
 	slang? ( sys-libs/slang )
 	!build? ( systemd? ( sys-apps/systemd ) )
 	udev? ( virtual/libudev:= )"
-BDEPEND="
+DEPEND="${RDEPEND}
 	virtual/pkgconfig
 	nls? ( sys-devel/gettext )
 	test? ( sys-devel/bc )
-"
-DEPEND="
-	${RDEPEND}
-	virtual/os-headers
-"
+	virtual/os-headers"
 RDEPEND+="
-	hardlink? ( !app-arch/hardlink )
-	logger? ( !>=app-admin/sysklogd-2.0[logger] )
 	kill? (
 		!sys-apps/coreutils[kill]
 		!sys-process/procps[kill]
-	)
-	su? (
-		!<sys-apps/shadow-4.7-r2
-		!>=sys-apps/shadow-4.7-r2[su]
 	)
 	!net-wireless/rfkill
 	!<app-shells/bash-completion-2.7-r1"
@@ -76,6 +59,12 @@ RESTRICT="!test? ( test )"
 S="${WORKDIR}/${MY_P}"
 
 PATCHES=(
+	# In glibc-2.29+, a lot of changes were made to arch-specific
+	# handling of `struct termios', which breaks atleast MIPS.
+	# The below patch from upstream fixes this, and should be
+	# in the next release.
+	# See: https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/commit/?id=963413a1adf6767ab17712097e288e1a346f63a7
+	"${FILESDIR}/${PN}-2.33.1-fix-struct_termios-check.patch"
 )
 
 src_prepare() {
@@ -116,7 +105,6 @@ lfs_fallocate_test() {
 
 python_configure() {
 	local myeconfargs=(
-		"${commonargs[@]}"
 		--disable-all-programs
 		--disable-bash-completion
 		--without-systemdsystemunitdir
@@ -148,13 +136,8 @@ multilib_src_configure() {
 	export NCURSES6_CONFIG=false NCURSES5_CONFIG=false
 	export NCURSESW6_CONFIG=false NCURSESW5_CONFIG=false
 
-	# configure args shared by python and non-python builds
-	local commonargs=(
-		--enable-fs-paths-extra="${EPREFIX}/usr/sbin:${EPREFIX}/bin:${EPREFIX}/usr/bin"
-	)
-
 	local myeconfargs=(
-		"${commonargs[@]}"
+		--enable-fs-paths-extra="${EPREFIX}/usr/sbin:${EPREFIX}/bin:${EPREFIX}/usr/bin"
 		--with-bashcompletiondir="$(get_bashcompdir)"
 		--without-python
 		$(multilib_native_use_enable suid makeinstall-chown)
@@ -165,13 +148,12 @@ multilib_src_configure() {
 		$(multilib_native_use_with udev)
 		$(multilib_native_usex ncurses "$(use_with unicode ncursesw)" '--without-ncursesw')
 		$(multilib_native_usex ncurses "$(use_with !unicode ncurses)" '--without-ncurses')
-		$(multilib_native_use_with audit)
 		$(tc-has-tls || echo --disable-tls)
 		$(use_enable nls)
 		$(use_enable unicode widechar)
 		$(use_enable static-libs static)
-		$(use_with ncurses tinfo)
 		$(use_with selinux)
+		$(use_with ncurses tinfo)
 	)
 	# build programs only on GNU, on *BSD we want libraries only
 	if multilib_is_native_abi && use userland_GNU; then
@@ -180,6 +162,7 @@ multilib_src_configure() {
 			--disable-login
 			--disable-nologin
 			--disable-pylibmount
+			--disable-su
 			--enable-agetty
 			--enable-bash-completion
 			--enable-line
@@ -192,15 +175,10 @@ multilib_src_configure() {
 			$(use_enable caps setpriv)
 			$(use_enable cramfs)
 			$(use_enable fdformat)
-			$(use_enable hardlink)
-			$(use_enable kill)
-			$(use_enable logger)
-			$(use_enable ncurses pg)
-			$(use_enable su)
 			$(use_enable tty-helpers mesg)
 			$(use_enable tty-helpers wall)
 			$(use_enable tty-helpers write)
-			$(use_with cryptsetup)
+			$(use_enable kill)
 		)
 	else
 		myeconfargs+=(
@@ -266,7 +244,6 @@ multilib_src_install() {
 		python_foreach_impl python_install
 	fi
 
-	# This needs to be called AFTER python_install call (#689190)
 	emake DESTDIR="${D}" install
 
 	if multilib_is_native_abi && use userland_GNU; then
@@ -284,7 +261,7 @@ multilib_src_install_all() {
 	if ! use userland_GNU; then
 		# manpage collisions
 		# TODO: figure out a good way to keep them
-		rm "${ED}"/usr/share/man/man3/uuid* || die
+		rm "${ED%/}"/usr/share/man/man3/uuid* || die
 	fi
 
 	if use pam; then

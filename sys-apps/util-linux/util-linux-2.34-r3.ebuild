@@ -3,7 +3,7 @@
 
 EAPI=7
 
-PYTHON_COMPAT=( python3_{6,7,8,9} )
+PYTHON_COMPAT=( python3_{6,7} )
 
 inherit toolchain-funcs libtool flag-o-matic bash-completion-r1 usr-ldscript \
 	pam python-r1 multilib-minimal multiprocessing systemd
@@ -23,24 +23,18 @@ fi
 DESCRIPTION="Various useful Linux utilities"
 HOMEPAGE="https://www.kernel.org/pub/linux/utils/util-linux/ https://github.com/karelzak/util-linux"
 
-LICENSE="GPL-2 GPL-3 LGPL-2.1 BSD-4 MIT public-domain"
+LICENSE="GPL-2 LGPL-2.1 BSD-4 MIT public-domain"
 SLOT="0"
-IUSE="audit build caps +cramfs cryptsetup fdformat hardlink kill +logger ncurses nls pam python +readline selinux slang static-libs su +suid systemd test tty-helpers udev unicode userland_GNU"
+IUSE="build caps +cramfs fdformat hardlink kill +logger ncurses nls pam python +readline selinux slang static-libs su +suid systemd test tty-helpers udev unicode userland_GNU"
 
 # Most lib deps here are related to programs rather than our libs,
 # so we rarely need to specify ${MULTILIB_USEDEP}.
 RDEPEND="
-	virtual/libcrypt:=
-	audit? ( >=sys-process/audit-2.6:= )
 	caps? ( sys-libs/libcap-ng )
 	cramfs? ( sys-libs/zlib:= )
-	cryptsetup? ( sys-fs/cryptsetup )
-	hardlink? ( dev-libs/libpcre2:= )
 	ncurses? ( >=sys-libs/ncurses-5.2-r2:0=[unicode?] )
 	nls? ( virtual/libintl[${MULTILIB_USEDEP}] )
 	pam? ( sys-libs/pam )
-	ppc? ( sys-libs/librtas )
-	ppc64? ( sys-libs/librtas )
 	python? ( ${PYTHON_DEPS} )
 	readline? ( sys-libs/readline:0= )
 	selinux? ( >=sys-libs/libselinux-2.2.2-r4[${MULTILIB_USEDEP}] )
@@ -74,9 +68,6 @@ REQUIRED_USE="python? ( ${PYTHON_REQUIRED_USE} )"
 RESTRICT="!test? ( test )"
 
 S="${WORKDIR}/${MY_P}"
-
-PATCHES=(
-)
 
 src_prepare() {
 	default
@@ -165,7 +156,6 @@ multilib_src_configure() {
 		$(multilib_native_use_with udev)
 		$(multilib_native_usex ncurses "$(use_with unicode ncursesw)" '--without-ncursesw')
 		$(multilib_native_usex ncurses "$(use_with !unicode ncurses)" '--without-ncurses')
-		$(multilib_native_use_with audit)
 		$(tc-has-tls || echo --disable-tls)
 		$(use_enable nls)
 		$(use_enable unicode widechar)
@@ -195,12 +185,10 @@ multilib_src_configure() {
 			$(use_enable hardlink)
 			$(use_enable kill)
 			$(use_enable logger)
-			$(use_enable ncurses pg)
 			$(use_enable su)
 			$(use_enable tty-helpers mesg)
 			$(use_enable tty-helpers wall)
 			$(use_enable tty-helpers write)
-			$(use_with cryptsetup)
 		)
 	else
 		myeconfargs+=(
