@@ -410,6 +410,13 @@ python_gen_cond_dep() {
 				local usedep=$(python_gen_usedep "${@}")
 				dep=${dep//\$\{PYTHON_USEDEP\}/${usedep}}
 			fi
+			# Flatcar: A temporary hack for packages using
+			# an already deprecated PYTHON_MULTI_USEDEP
+			# feature.
+			if [[ ${dep} == *'${PYTHON_MULTI_USEDEP}'* ]]; then
+				local usedep=$(python_gen_usedep "${@}")
+				dep=${dep//\$\{PYTHON_MULTI_USEDEP\}/${usedep}}
+			fi
 
 			matches+=( "${flag_prefix}_${impl}? ( ${dep} )" )
 		fi
